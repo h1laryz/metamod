@@ -131,7 +131,6 @@ jobs:
           fi
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: metamod-build-${{ matrix.os_short }}-${{ matrix.compiler_cc }} # Имя артефакта, например, "metamod-build-windows-msvc-vs2022"
-          path: metamod-source/build/ # Путь к директории с собранными файлами
+          path: ./build
