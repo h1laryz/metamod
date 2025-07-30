@@ -2,12 +2,10 @@ name: Continuous Integration
 on: 
   push:
     branches:
-      - master
-      - '[0-9]+.[0-9]+-dev'
+      - cs2
   pull_request:
     branches:
-      - master
-      - '[0-9]+.[0-9]+-dev'
+      - cs2
 jobs:
   test:
     strategy:
@@ -32,7 +30,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os_short }}-${{ matrix.compiler_cc }}
     env:
-      SDKS: '["episode1","tf2","l4d2","csgo","dota"]'
+      SDKS: '["cs2"]'
       DEPENDENCIES_FOLDER: dependencies
       DEPENDENCIES_ROOT: ${{ github.workspace }}/dependencies
     steps:
@@ -42,7 +40,7 @@ jobs:
           path: metamod-source
       
       - name: Select HL2SDKs
-        run: echo 'SDKS=["episode1","tf2","l4d2","cs2","insurgency"]' >> $GITHUB_ENV
+        run: echo 'SDKS=["cs2"]' >> $GITHUB_ENV
 
       - name: Cache dependencies
         uses: actions/cache@v3
