@@ -1,31 +1,36 @@
-name: Continuous Integration
+name: Release Build
 on: 
+  create:
+    tags:
+      - 'v*'
   push:
-    branches:
-      - cs2
-  pull_request:
-    branches:
-      - cs2
+    tags:
+      - 'v*'
+
 jobs:
-  test:
+  build:
     strategy:
       matrix:
         include:
           - os: windows-latest
             os_short: windows
             compiler_cc: msvc-vs2022
+            artifact_suffix: windows-vs2022
           - os: windows-2022
             os_short: windows
             compiler_cc: msvc-vs2019
+            artifact_suffix: windows-vs2019
           - os: ubuntu-latest
             os_short: linux
             compiler_cc: clang
             compiler_cxx: clang++
+            artifact_suffix: linux-clang
           - os: ubuntu-22.04
             os_short: linux
             compiler_cc: clang-14
             compiler_cxx: clang++-14
             compiler_install: clang-14
+            artifact_suffix: linux-clang14
       fail-fast: false
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os_short }}-${{ matrix.compiler_cc }}
@@ -130,7 +135,57 @@ jobs:
             ./${{ matrix.os_short }}-x86_64/test_sourcehook -v
           fi
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Package artifacts
+        shell: bash
+        working-directory: metamod-source
+        run: |
+          # Create release package
+          mkdir -p release-package
+          
+          # Copy built binaries and important files
+          find build -name "*.so" -o -name "*.dll" -o -name "*.dylib" | xargs -I {} cp {} release-package/ 2>/dev/null || true
+          
+          # Copy additional files if they exist
+          [ -f README.md ] && cp README.md release-package/
+          [ -f LICENSE ] && cp LICENSE release-package/
+          [ -f CHANGELOG.md ] && cp CHANGELOG.md release-package/
+          
+          # Create archive
+          if [[ "${{ matrix.os_short }}" == "windows" ]]; then
+            7z a metamod-${{ matrix.artifact_suffix }}.zip release-package/*
+          else
+            tar -czf metamod-${{ matrix.artifact_suffix }}.tar.gz -C release-package .
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
         with:
-          path: /metamod/build
+          name: metamod-${{ matrix.artifact_suffix }}
+          path: |
+            metamod-source/metamod-${{ matrix.artifact_suffix }}.zip
+            metamod-source/metamod-${{ matrix.artifact_suffix }}.tar.gz
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
